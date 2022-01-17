@@ -1,0 +1,144 @@
+---
+Name: Chee Kitt Win
+Title: STAT3500 Assignment 1
+output:
+  html_document: default
+  pdf_document: default
+---
+
+# STAT3500 Assignment 1
+## Name: Chee Kitt Win
+## Student Number: 45589140
+
+
+### Importing Libraries and EDA
+```{r}
+parasite = read.csv("C:\\Users\\Owner\\Desktop\\UQ Year 3 Sem 2 Courses\\STAT3500\\Assignment 1\\parasite.csv")
+cholest = read.csv("C:\\Users\\Owner\\Desktop\\UQ Year 3 Sem 2 Courses\\STAT3500\\Assignment 1\\cholest.csv")
+library(lattice)
+summary(parasite)
+head(parasite)
+plot(parasite)
+```
+
+### 4.a)
+### Below are some graphical and numerical summaries of the new variable I named INF_PROPORTION
+```{r part a)}
+# Create the new variable
+
+parasite$INF_PROPORTION = parasite$NUM.INF/parasite$NUM.EXAM
+
+# Graphical summaries of INF_PROPORTION 
+
+hist(parasite$INF_PROPORTION, xlab = "Proportion of examined patients infected", ylab = "Number of villages", main ="Proportion of examined patients infected in each village",ylim = c(0,30), xlim = c(0,0.6))
+densityplot(parasite$INF_PROPORTION, xlab = "Proportion of examined patients infected", ylab = "Number of villages", main ="Proportion of examined patients infected in each village")
+qqnorm(parasite$INF_PROPORTION, main="QQ norm of INF_PROPORTION");  
+qqline(parasite$INF_PROPORTION)
+boxplot(parasite$INF_PROPORTION, main="Boxplot of INF_PROPORTION")
+
+# Numerical summary of INF_PROPORTION
+
+summary(parasite$INF_PROPORTION)
+```
+### From the barchart, we can see that the data is skewed to the right. The data seem to be centred around 2 "peaks" at 0 and 0.3, and this is more pronounced when looking at the density plot. As expected, the data doesn't look very normal from the QQ plot, especially at the tails.The boxplot and numerical summaries tell us that the mean is 0.19525, which is somewhere between the 2 "peaks" as expected. 
+
+### I decided to use a logit transformation on INF_PROPORTION to make sure that it is bounded between 0 and 1 since it is a proportion.Since some of the INF_PROPORTION values are 0, I added a small value of 0.01 before transforming. Below is the corresponding barchart.
+
+```{r}
+parasite$LOGIT_INF_PROPORTION = log((parasite$INF_PROPORTION+0.01)/(1-(parasite$INF_PROPORTION+0.01)))
+hist(parasite$LOGIT_INF_PROPORTION, ylab = "Number of villages", main ="Histogram of logit transform of INF_PROPORTION", xlim = c(-6,1), ylim = c(0,40))
+
+```
+
+### 4.b)
+### Fitting the kitchen sink linear model, we see that the R squared and adjusted R squared values are almost 0.7 which indicates high linear correlation, so our approximate linear relationship assumption for linear regression is satisfied. The p values of all the corresponding explanatory variables excluding longitude are very small which indicates that after performing a T test on the corresponding coefficients, there is very strong evidence to reject the null hypothesis (that the relevant coefficient is 0), indicating that there is a relationship between the corresponding explanatory variable and the response variable. The residual error is 0.7003 which intuitively is very small when you look at the histogram of LOGIT_INF_PROPORTION which has values ranging from -5 to 1. Overall, all these facts indicate a good fit to the model.
+```{r 4.b)}
+parasite.lm.full = lm(LOGIT_INF_PROPORTION ~ ELEVATION + LATITUDE + LONGITUDE + MEAN.NDVI, data=parasite)
+summary(parasite.lm.full)
+
+```
+
+### 4.c)
+### The insignificant covariate here is LONGITUDE. After removing it and refitting the model, we find that the R squared values and residual standard errors have been almost unchanged. What has changed is that the p-values have become even smaller which shows even stronger evidence that they affect the response. As with before, the approximate linear relationship assumption is satisfied. From the bar chart, we see that our normally distributed residuals assumption is also satisfied. This can also be seen from the QQ plot where the line is pretty straight. The constant variance for the residuals is the only condition that is slightly questionable, but it does not seem to be that bad from the residual plot, so overall, the fit is good.
+
+```{r 4.c)}
+# 4(c) Remove LONGITUDE and refit model
+parasite.lm.refit = lm(LOGIT_INF_PROPORTION ~ ELEVATION + MEAN.NDVI + LATITUDE, data=parasite)
+summary(parasite.lm.refit)
+
+# Residual analysis 
+res = residuals(parasite.lm.refit)
+hist(res, main = "Histogram of the residuals")
+plot(parasite.lm.refit, which=c(1,2), id.n=10)
+
+```
+
+### 5.a) 
+### Plot of data with gender identified
+
+```{r Q5(a)}
+# Summary of cholest data
+
+summary(cholest)
+
+# 5(a) Plot data with gender identified 
+
+plot(disease~cholesterol, data = cholest, col = factor(cholest$genderS), main = "Data")
+legend(5.5, 0.6, legend=c("female","male"), col=c("red","black"), pch=1:1)
+```
+
+### 5.b) 
+### The fitted interaction term has a corresponding p value of 0.51208 which shows that it is insignificant and suggests that we should retain the null hypothesis (that the coefficient is 0). In other words, different combinations of genders and cholesterol levels do not significantly affect the likelihood of disease (apart from the independent contributions from each of those variables). 
+
+```{r Q5(b)}
+# 5(b) Logistic model for gender and cholesterol levels
+
+cholest.logit <- glm(disease ~ cholesterol + genderS + cholesterol:genderS, data = cholest, family = binomial)
+summary(cholest.logit)
+```
+
+### Since both the interaction term and gender have p values of approximately 0.5, they are insignificant, and after removing them and fitting the model, we get the following plot shown below.
+```{r}
+
+# Logistic model without gender
+
+cholest.logit.refit <- glm(disease ~ cholesterol, cholest, family=binomial)
+summary(cholest.logit.refit)
+
+# Add the fitted line to plot in a)
+
+newdata = data.frame(cholesterol = seq(min(cholest$cholesterol),max(cholest$cholesterol), len=100))
+newdata$logit = predict(cholest.logit.refit, newdata, type = "response")
+plot(disease~cholesterol, data = cholest, col = factor(cholest$genderS), main = "Logit model")
+lines(newdata$cholesterol, newdata$logit, lwd=2)
+legend(4.5, 0.6, legend=c("female","male"), col=c("red","black"), pch=1:1)
+
+```
+
+
+
+### 5. c)
+### Expression for the fitted probit model: $\Phi^{-1}(disease) = -5.5537 + 0.9411*cholesterol$. 
+```{r Q5(c)}
+# 5(c) Fit probit model 
+
+cholest.probit <- glm(disease ~ cholesterol, data=cholest, family=binomial(link="probit"))
+summary(cholest.probit)
+```
+
+### 5. d)
+### The following graph shows that the probit and logit models are very similar in this instance and there is no significant difference between them.
+
+```{r Q5(d)}
+# 5(d) Add fitted probit mean curve to the graph 
+
+newdata = data.frame(cholesterol=seq(min(cholest$cholesterol),max(cholest$cholesterol), len=100))
+newdata$logit = predict(cholest.logit.refit, newdata, type="response")
+newdata1 = data.frame(cholesterol=seq(min(cholest$cholesterol),max(cholest$cholesterol), len=100))
+newdata1$probit = predict(cholest.probit, newdata, type="response")
+plot(disease~cholesterol, data=cholest, col=factor(cholest$genderS), main = "Logit vs Probit model")
+lines(newdata$cholesterol, newdata$logit, lwd=2, col="purple")
+lines(newdata$cholesterol, newdata1$probit, lwd=2, col="green")
+legend(6.5, 0.6, legend=c("female","male"), col=c("red","black"), pch=1:1)
+legend(6.5, 0.3, legend=c("logit","probit"), col=c("purple","green"), lty=1:1)
+```
